@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Cartes Chance</title>
   <style>
 :root {
@@ -15,7 +15,7 @@
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { height: 100%; }
-body { min-height: 100vh; height: 100vh; }
+body { height: 100vh; height: 100dvh; }   /* dvh = zone réellement visible sur mobile */
 body {
   font-family: "Inter", system-ui, sans-serif;
   color: #fff;
@@ -41,8 +41,8 @@ body {
   opacity: 0; pointer-events: none; transition: opacity .4s ease;
 }
 .screen.is-active { opacity: 1; pointer-events: auto; }
-#screen-draw { justify-content: space-between; padding: 22% 20px 28px; }
-#screen-result { justify-content: space-between; padding: 7% 20px 24px; overflow-y: auto; }
+#screen-draw { justify-content: space-between; padding: 22% 20px calc(28px + env(safe-area-inset-bottom, 0px)); overflow-y: auto; gap: 24px; }
+#screen-result { justify-content: space-between; padding: 7% 20px calc(24px + env(safe-area-inset-bottom, 0px)); overflow-y: auto; gap: 24px; }
 
 /* Cartes */
 .card {
@@ -137,6 +137,12 @@ body {
   display: flex; flex-direction: column; gap: 6px;
 }
 .btn--card { background: #fff; color: #06222b; font-weight: 600; }
+
+/* Petits écrans en hauteur : on resserre pour que le bouton reste visible */
+@media (max-height: 620px) {
+  #screen-draw { padding-top: 6%; }
+  .card--back { height: 150px; }
+}
 
 </style>
 </head>
