@@ -122,6 +122,22 @@ body {
   .card--face.has-choices { grid-template-columns: 1fr; grid-template-areas: "title" "question" "choices" "feedback"; }
 }
 
+/* Catégories : défi créatif, bonus, malus */
+[hidden] { display: none !important; }
+.choices:empty { display: none; }
+.card--face.type-defi { background: #b45309; }
+.card--face.type-bonus { background: #15803d; }
+.card--face.type-malus { background: #b91c1c; }
+.card__num { position: absolute; top: 6px; left: 14px; font-size: .85rem; opacity: .9; }
+.card__num:empty, .card__name:empty { display: none; }
+.card__name { font-weight: 700; font-size: 1rem; }
+.effect {
+  width: 100%; text-align: left; font-size: .85rem; line-height: 1.45;
+  padding: 10px 12px; border-radius: 10px; background: rgba(10,20,50,.82); color: #fff;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.btn--card { background: #fff; color: #06222b; font-weight: 600; }
+
 </style>
 </head>
 <body>
@@ -145,10 +161,14 @@ body {
     <!-- ÉCRAN 3 : résultat -->
     <section id="screen-result" class="screen">
       <article id="result-card" class="card card--face">
+        <span id="result-num" class="card__num"></span>
         <span id="result-level" class="card__level"></span>
         <h2 id="result-title" class="card__title">CHANCE</h2>
+        <p id="result-name" class="card__name"></p>
         <p id="result-text" class="card__text"></p>
         <ul id="result-choices" class="choices"></ul>
+        <button id="btn-reveal" class="btn btn--card" type="button" hidden>VOIR LA VALIDATION</button>
+        <div id="result-effect" class="effect" role="status" aria-live="polite" hidden></div>
         <p id="result-feedback" class="feedback" role="status" aria-live="polite" hidden></p>
       </article>
       <button id="btn-again" class="btn" type="button">PIOCHER UNE AUTRE CARTE</button>
@@ -161,51 +181,62 @@ body {
 // choices : exactement 3 réponses (A, B, C)
 // answer : index de la bonne réponse (0 = A, 1 = B, 2 = C)
 // correction : texte affiché après « Correction : X — »
+// type : "defi" | "bonus" | "malus" (sinon : QCM) — n : numéro affiché sur la carte
+// defi : consigne + validation (+ note) ; bonus / malus : text + effect
+// Règle des défis : réussi = +75 crédits versés par la banque, non réussi = aucun gain ni perte
 window.CARDS = [
   // ===== Questions d'origine, classées Easy → Medium → Difficult =====
   {  // 03 — Le bon public
+    n: "03",
     level: "easy", label: "Easy", title: "CHANCE",
     question: "Une boutique vend du matériel de randonnée. Quel message correspond le mieux à son activité ?",
     choices: ["Prêts pour les sentiers", "Le goût du pain chaud", "Une nouvelle coupe de cheveux"],
     answer: 0, correction: "Prêts pour les sentiers."
   },
   {  // 05 — La bonne information
+    n: "05",
     level: "easy", label: "Easy", title: "CHANCE",
     question: "Une affiche annonce un événement. Quelle information aide le public à savoir quand venir ?",
     choices: ["La couleur préférée de l’organisateur", "Le prix de fabrication de l’affiche", "La date et l’heure"],
     answer: 2, correction: "La date et l’heure."
   },
   {  // 06 — Le slogan adapté
+    n: "06",
     level: "easy", label: "Easy", title: "CHANCE",
     question: "Quel slogan convient le mieux à un service de réparation de vélos ?",
     choices: ["Votre vélo reprend la route", "Des biscuits à partager", "Le sommeil en douceur"],
     answer: 0, correction: "Votre vélo reprend la route."
   },
   {  // 02 — Une publicité claire
+    n: "02",
     level: "medium", label: "Medium", title: "CHANCE",
     question: "Quel message annonce le plus clairement une réduction ?",
     choices: ["Une surprise vous attend peut-être", "Nos produits sont intéressants", "−20 % sur tous les sacs aujourd’hui"],
     answer: 2, correction: "La réduction et les produits concernés sont précisés."
   },
   {  // 04 — Le logo disparaît
+    n: "04",
     level: "medium", label: "Medium", title: "CHANCE",
     question: "Quel placement permet de mieux voir un logo ?",
     choices: ["Derrière une photo", "Dans une zone dégagée", "En dehors de l’affiche"],
     answer: 1, correction: "Dans une zone dégagée."
   },
   {  // 07 — Un message lisible
+    n: "07",
     level: "medium", label: "Medium", title: "CHANCE",
     question: "Pour lire une affiche de loin, quel choix est le plus adapté ?",
     choices: ["Un très long texte minuscule", "Un message court écrit assez grand", "Du texte caché sous les images"],
     answer: 1, correction: "Un message court écrit assez grand."
   },
   {  // 01 — Le bon emballage
+    n: "01",
     level: "difficult", label: "Difficult", title: "CHANCE",
     question: "Une marque veut que ses clients la reconnaissent sur tous ses produits. Que faut-il retrouver sur ses emballages ?",
     choices: ["Un nom différent sur chacun", "Des éléments communs, comme le nom et le logo", "Uniquement le même poids"],
     answer: 1, correction: "Des éléments communs."
   },
   {  // 08 — Une erreur à corriger
+    n: "08",
     level: "difficult", label: "Difficult", title: "CHANCE",
     question: "Une marque s’appelle Nova. Son site affiche Navo par erreur. Quelle est la bonne réaction ?",
     choices: ["Changer le nom sur tous les produits sans demander", "Ne rien corriger", "Rétablir Nova sur le site"],
@@ -213,79 +244,211 @@ window.CARDS = [
   },
 
   // ===== Nouvelles questions (niveaux mélangés) =====
-  {  // 14 — Trop de styles
+  {  // extra — Trop de styles
     level: "difficult", label: "Difficult", title: "CHANCE",
     question: "Une affiche mélange trois polices et sept couleurs. Quel est le principal risque ?",
     choices: ["Un message confus et une marque peu reconnaissable", "Une affiche trop légère à imprimer", "Aucun : plus il y a de styles, mieux c’est"],
     answer: 0, correction: "Un message confus et une marque peu reconnaissable."
   },
-  {  // 09 — Les horaires
+  {  // extra — Les horaires
     level: "easy", label: "Easy", title: "CHANCE",
     question: "Une boulangerie veut annoncer ses horaires. Où faut-il les afficher ?",
     choices: ["Dans un tiroir fermé", "Sur la vitrine, bien visibles", "Sur un papier jeté au sol"],
     answer: 1, correction: "Sur la vitrine, bien visibles."
   },
-  {  // 17 — Un avis négatif
+  {  // extra — Un avis négatif
     level: "difficult", label: "Difficult", title: "CHANCE",
     question: "Un client critique un produit sur les réseaux sociaux. Quelle réponse protège le mieux l’image de la marque ?",
     choices: ["Supprimer le commentaire sans répondre", "Répondre vite, poliment, en proposant une solution", "Répondre sèchement pour défendre la marque"],
     answer: 1, correction: "Répondre vite, poliment, en proposant une solution."
   },
-  {  // 13 — Se démarquer
+  {  // extra — Se démarquer
     level: "medium", label: "Medium", title: "CHANCE",
     question: "Un restaurant veut se démarquer de ses concurrents. Que doit-il mettre en avant ?",
     choices: ["Ce que tous les autres disent déjà", "Un message vague, sans détail", "Ce qui le rend unique, comme une spécialité"],
     answer: 2, correction: "Ce qui le rend unique, comme une spécialité."
   },
-  {  // 19 — La bonne image
+  {  // extra — La bonne image
     level: "easy", label: "Easy", title: "CHANCE",
     question: "Quelle photo choisir pour promouvoir un service de jardinage ?",
     choices: ["Un jardin fleuri et bien entretenu", "Une salle de bain", "Un garage encombré"],
     answer: 0, correction: "Un jardin fleuri et bien entretenu."
   },
-  {  // 11 — Plusieurs publics
+  {  // extra — Plusieurs publics
     level: "difficult", label: "Difficult", title: "CHANCE",
     question: "Une affiche s’adresse à la fois aux adolescents et aux seniors. Quelle approche est la plus efficace ?",
     choices: ["Un jargon propre à un seul groupe", "Un texte très long et technique", "Un message simple, compréhensible par tous"],
     answer: 2, correction: "Un message simple, compréhensible par tous."
   },
-  {  // 16 — Le contraste
+  {  // extra — Le contraste
     level: "medium", label: "Medium", title: "CHANCE",
     question: "Pourquoi utilise-t-on un fort contraste entre le texte et le fond ?",
     choices: ["Pour faciliter la lecture", "Pour économiser de l’encre", "Pour cacher le message"],
     answer: 0, correction: "Pour faciliter la lecture."
   },
-  {  // 12 — L’appel à l’action
+  {  // extra — L’appel à l’action
     level: "easy", label: "Easy", title: "CHANCE",
     question: "Quel élément d’un flyer invite le public à agir ?",
     choices: ["Un appel à l’action, comme « Réservez maintenant »", "Un fond uni", "Une marge vide"],
     answer: 0, correction: "Un appel à l’action, comme « Réservez maintenant »."
   },
-  {  // 20 — Mesurer l’efficacité
+  {  // extra — Mesurer l’efficacité
     level: "difficult", label: "Difficult", title: "CHANCE",
     question: "Une marque veut savoir si son affiche a été efficace. Quelle méthode est la plus pertinente ?",
     choices: ["Demander à un seul ami s’il aime les couleurs", "Se fier à son intuition", "Comparer les ventes avant et après la campagne"],
     answer: 2, correction: "Comparer les ventes avant et après la campagne."
   },
-  {  // 10 — Changer de logo
+  {  // extra — Changer de logo
     level: "medium", label: "Medium", title: "CHANCE",
     question: "Une marque change de logo. Que doit-elle faire pour rester reconnaissable ?",
     choices: ["Garder des repères familiers, comme la couleur ou le nom", "Tout changer sans prévenir, y compris le nom", "Retirer le logo des produits"],
     answer: 0, correction: "Garder des repères familiers."
   },
-  {  // 15 — Lancer un produit
+  {  // extra — Lancer un produit
     level: "easy", label: "Easy", title: "CHANCE",
     question: "Pour le lancement d’un produit, quelle information le public doit-il trouver ?",
     choices: ["Le nom de l’imprimeur uniquement", "L’âge du créateur", "Le nom du produit et ce qu’il apporte"],
     answer: 2, correction: "Le nom du produit et ce qu’il apporte."
   },
-  {  // 18 — Un slogan efficace
+  {  // extra — Un slogan efficace
     level: "medium", label: "Medium", title: "CHANCE",
     question: "Un bon slogan doit être…",
     choices: ["Long et compliqué", "Différent à chaque publication", "Court et facile à retenir"],
     answer: 2, correction: "Court et facile à retenir."
+  },
+
+  // ===== 2. Défis créatifs (09–16) : réussi = +75 crédits, non réussi = rien =====
+  {  // 09 — Le slogan express
+    type: "defi", n: "09", title: "DÉFI CRÉATIF", name: "Le slogan express",
+    consigne: "En 20 secondes, invente un slogan pour ta marque en quatre mots maximum.",
+    validation: "Le slogan respecte la limite et évoque ton produit ou ton service."
+  },
+  {  // 10 — Présentation éclair
+    type: "defi", n: "10", title: "DÉFI CRÉATIF", name: "Présentation éclair",
+    consigne: "En 20 secondes, présente ta marque en indiquant son nom, ce qu’elle propose et à qui elle s’adresse.",
+    validation: "Les trois informations sont présentes."
+  },
+  {  // 11 — Dessine sans lettres
+    type: "defi", n: "11", title: "DÉFI CRÉATIF", name: "Dessine sans lettres",
+    consigne: "En 30 secondes, dessine un symbole lié à ton produit ou service, sans écrire de lettre ni de mot.",
+    validation: "Aucune lettre n’apparaît et tu expliques le lien avec ton activité en une phrase.",
+    note: "Le dessin n’est jamais évalué sur sa beauté."
+  },
+  {  // 12 — Trois mots pour ta marque
+    type: "defi", n: "12", title: "DÉFI CRÉATIF", name: "Trois mots pour ta marque",
+    consigne: "En 20 secondes, donne trois adjectifs différents pour décrire l’image que tu veux donner à ta marque.",
+    validation: "Trois adjectifs distincts sont proposés. Par exemple : pratique, joyeuse, sportive."
+  },
+  {  // 13 — Le slogan à deux mots
+    type: "defi", n: "13", title: "DÉFI CRÉATIF", name: "Le slogan à deux mots",
+    consigne: "En 20 secondes, invente un slogan de deux mots exactement pour une marque de biscuits.",
+    validation: "Le slogan contient deux mots et peut accompagner des biscuits. Exemple accepté : Pause gourmande."
+  },
+  {  // 14 — Corrige l’affiche
+    type: "defi", n: "14", title: "DÉFI CRÉATIF", name: "Corrige l’affiche",
+    consigne: "Une affiche annonce : « Ouverture samedi 12 juin ». Plus bas, elle indique : « Rendez-vous dimanche 12 juin ». En 15 secondes, explique ce qu’il faut vérifier et corriger.",
+    validation: "Tu repères la contradiction entre samedi et dimanche et proposes de vérifier le bon jour avant d’harmoniser l’affiche."
+  },
+  {  // 15 — La marque en trois éléments
+    type: "defi", n: "15", title: "DÉFI CRÉATIF", name: "La marque en trois éléments",
+    consigne: "En 20 secondes, cite trois éléments, autres que le nom, qui peuvent aider à reconnaître une marque.",
+    validation: "Trois éléments différents parmi : logo, couleurs, style de lettres, slogan, mascotte, forme d’emballage ou autre réponse pertinente."
+  },
+  {  // 16 — Un message qui agit
+    type: "defi", n: "16", title: "DÉFI CRÉATIF", name: "Un message qui agit",
+    consigne: "En 20 secondes, invente une courte phrase publicitaire qui commence par un verbe d’action pour inviter à découvrir ta marque.",
+    validation: "La phrase commence par un verbe à l’impératif et évoque ta marque, son produit ou son service. Exemple : Découvrez nos sacs réutilisables."
+  },
+
+  // ===== 3. Bonus et coups de chance (17–24) : aucune réponse, effet direct =====
+  {  // 17 — Campagne remarquée
+    type: "bonus", n: "17", title: "BONUS", name: "Campagne remarquée",
+    text: "Ta nouvelle publicité attire de nouveaux clients !",
+    effect: "La banque te verse 100 crédits."
+  },
+  {  // 18 — Recommandation client
+    type: "bonus", n: "18", title: "BONUS", name: "Recommandation client",
+    text: "Un client satisfait parle de ta marque autour de lui.",
+    effect: "La banque te verse 75 crédits."
+  },
+  {  // 19 — Aide au lancement
+    type: "bonus", n: "19", title: "BONUS", name: "Aide au lancement",
+    text: "Ton projet reçoit un petit soutien pour démarrer.",
+    effect: "La banque te verse 150 crédits."
+  },
+  {  // 20 — Bon de réduction
+    type: "bonus", n: "20", title: "BONUS", name: "Bon de réduction",
+    text: "Un prestataire t’accorde une remise sur ton prochain élément de marque.",
+    effect: "Conserve cette carte : réduction de 100 crédits sur un prochain achat à la banque, sans descendre sous 0. Usage unique, sans rendu de monnaie."
+  },
+  {  // 21 — Autorisation exceptionnelle
+    type: "bonus", n: "21", title: "BONUS", name: "Autorisation exceptionnelle",
+    text: "Le propriétaire t’accorde une utilisation gratuite de son élément.",
+    effect: "Conserve cette carte : annule un seul prochain droit d’utilisation dû à un adversaire. Usage unique."
+  },
+  {  // 22 — Inspiration retrouvée
+    type: "bonus", n: "22", title: "BONUS", name: "Inspiration retrouvée",
+    text: "Tu sais exactement quel élément chercher !",
+    effect: "Avance jusqu’à la prochaine case d’une catégorie de ton choix, dans le sens du jeu. Applique normalement cette case."
+  },
+  {  // 23 — Petit contrat
+    type: "bonus", n: "23", title: "BONUS", name: "Petit contrat",
+    text: "Une autre entreprise te confie une petite mission.",
+    effect: "La banque te verse 50 crédits."
+  },
+  {  // 24 — Dernière minute sauvée
+    type: "bonus", n: "24", title: "BONUS", name: "Dernière minute sauvée",
+    text: "Un prestataire te rembourse une commande annulée à temps.",
+    effect: "La banque te verse 125 crédits."
+  },
+
+  // ===== 4. Malus et imprévus (25–32) : aucune réponse, effet direct =====
+  {  // 25 — Faute d’impression
+    type: "malus", n: "25", title: "MALUS", name: "Faute d’impression",
+    text: "Le nom de ta marque comporte une faute sur des flyers déjà imprimés. Il faut les refaire.",
+    effect: "Verse 75 crédits à la banque."
+  },
+  {  // 26 — Affiches oubliées
+    type: "malus", n: "26", title: "MALUS", name: "Affiches oubliées",
+    text: "Tu as oublié d’indiquer le lieu de ton événement. Une nouvelle impression est nécessaire.",
+    effect: "Verse 50 crédits à la banque."
+  },
+  {  // 27 — Photo à remplacer
+    type: "malus", n: "27", title: "MALUS", name: "Photo à remplacer",
+    text: "La photo prévue ne correspond pas au produit vendu. Il faut en produire une autre.",
+    effect: "Verse 100 crédits à la banque."
+  },
+  {  // 28 — Emballage trop petit
+    type: "malus", n: "28", title: "MALUS", name: "Emballage trop petit",
+    text: "Le nouvel emballage ne permet pas de placer correctement ton produit. Il doit être corrigé.",
+    effect: "Verse 125 crédits à la banque."
+  },
+  {  // 29 — Livraison urgente
+    type: "malus", n: "29", title: "MALUS", name: "Livraison urgente",
+    text: "Tu as pris du retard dans ta commande de supports publicitaires.",
+    effect: "Verse 75 crédits à la banque pour la livraison urgente."
+  },
+  {  // 30 — Rendez-vous avancé
+    type: "malus", n: "30", title: "MALUS", name: "Rendez-vous avancé",
+    text: "Ton client veut te voir plus tôt que prévu. Tu dois revenir sur tes pas.",
+    effect: "Recule de deux cases et applique la case d’arrivée."
+  },
+  {  // 31 — Budget publicitaire dépassé
+    type: "malus", n: "31", title: "MALUS", name: "Budget publicitaire dépassé",
+    text: "Tu as commandé plus de publicités que prévu.",
+    effect: "Verse 150 crédits à la banque."
+  },
+  {  // 32 — Dernière correction
+    type: "malus", n: "32", title: "MALUS", name: "Dernière correction",
+    text: "Un détail doit être corrigé sur tes supports avant leur diffusion.",
+    effect: "Verse 50 crédits à la banque. Tu conserves tous tes éléments de marque."
   }
 ];
+
+window.DEFI_RULES = {
+  success: "+75 crédits versés par la banque.",
+  failure: "aucun gain ni perte."
+};
 
 </script>
   <script>
@@ -338,41 +501,77 @@ document.addEventListener("DOMContentLoaded", function () {
     }, SHUFFLE_DURATION);
   }
 
-  // --- Écran 3 : carte tirée avec son QCM ---
+  // --- Écran 3 : carte tirée (QCM, défi créatif, bonus ou malus) ---
+  const RULES = window.DEFI_RULES || { success: "+75 crédits versés par la banque.", failure: "aucun gain ni perte." };
+
+  function fillBox(box, rows) {                    // rows : [[étiquette, texte], ...]
+    box.innerHTML = "";
+    rows.forEach(([label, text]) => {
+      const p = document.createElement("p");
+      const b = document.createElement("strong");
+      b.textContent = label + " : ";
+      p.appendChild(b);
+      p.appendChild(document.createTextNode(text));
+      box.appendChild(p);
+    });
+  }
+
   function showResult() {
     const card = CARDS[Math.floor(Math.random() * CARDS.length)];
+    const isQcm = !card.type && (card.choices || []).length > 0;
+    const type = card.type || (isQcm ? "qcm" : "text");
     const level = LEVELS.includes(card.level) ? card.level : "default";
     const el = $("result-card");
     const list = $("result-choices");
     const feedback = $("result-feedback");
+    const effect = $("result-effect");
+    const reveal = $("btn-reveal");
 
-    el.className = `card card--face level-${level}` + ((card.choices || []).length ? " has-choices" : "");
+    el.className = "card card--face " + (isQcm ? `level-${level} has-choices` : `type-${type} level-${level}`);
+    $("result-num").textContent = card.n || "";
     $("result-level").textContent = card.label || "";
     $("result-title").textContent = card.title || "CHANCE";
-    $("result-text").textContent = card.question || card.text || "";
-    feedback.hidden = true;
-    feedback.className = "feedback";
-    feedback.textContent = "";
+    $("result-name").textContent = isQcm ? "" : (card.name || "");
+    $("result-text").textContent = card.question || card.consigne || card.text || "";
+    feedback.hidden = true; feedback.className = "feedback"; feedback.textContent = "";
+    effect.hidden = true; effect.innerHTML = "";
+    reveal.hidden = true;
     list.innerHTML = "";
 
-    (card.choices || []).slice(0, 3).forEach((label, i) => {
-      const li = document.createElement("li");
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "choice";
-      btn.innerHTML = `<b>${LETTERS[i]}.</b> <span></span>`;
-      btn.lastElementChild.textContent = label;
-      btn.addEventListener("click", () => answer(card, i));
-      li.appendChild(btn);
-      list.appendChild(li);
-    });
+    if (isQcm) {
+      card.choices.slice(0, 3).forEach((label, i) => {
+        const li = document.createElement("li");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "choice";
+        btn.innerHTML = `<b>${LETTERS[i]}.</b> <span></span>`;
+        btn.lastElementChild.textContent = label;
+        btn.addEventListener("click", () => answer(card, i));
+        li.appendChild(btn);
+        list.appendChild(li);
+      });
+    } else if (type === "defi") {                  // la validation s'affiche à la demande
+      reveal.hidden = false;
+      reveal.onclick = () => {
+        const rows = [["Validation", card.validation],
+                      ["Défi réussi", RULES.success],
+                      ["Défi non réussi", RULES.failure]];
+        if (card.note) rows.push(["À noter", card.note]);
+        fillBox(effect, rows);
+        effect.hidden = false;
+        reveal.hidden = true;
+      };
+    } else if (type === "bonus" || type === "malus") {   // effet direct, sans réponse
+      fillBox(effect, [["Effet", card.effect]]);
+      effect.hidden = false;
+    }
 
     show("result");
     void el.offsetWidth;                           // relance l'animation
     el.classList.add("flip");
   }
 
-  // --- Réponse de l'utilisateur ---
+  // --- Réponse de l'utilisateur (QCM) ---
   function answer(card, picked) {
     const buttons = $("result-choices").querySelectorAll(".choice");
     const ok = picked === card.answer;
